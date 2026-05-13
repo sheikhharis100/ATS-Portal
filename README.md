@@ -95,8 +95,8 @@ Open [http://localhost:3000](http://localhost:3000)
 
 | | URL |
 |-|-----|
-| Frontend | `https://your-frontend-url.vercel.app` |
-| Backend API | `https://your-backend-url.onrender.com` |
+| Frontend | https://ats-portal-34fo.vercel.app |
+| Backend API | https://ats-backend-6f1b.onrender.com |
 
 ---
 
