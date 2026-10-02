@@ -27,26 +27,51 @@
 
 const mongoose = require('mongoose');
 
+// Fail fast rather than queueing operations for 10s while the DB is down.
+// Without this, every request hangs until Mongoose's buffering timeout fires.
+mongoose.set('bufferCommands', false);
+
+/** True only when a live connection is usable. */
+const isDbConnected = () => mongoose.connection.readyState === 1;
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('⚠️  MongoDB disconnected — database routes will return 503 until it recovers.');
+});
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconnected.');
+});
+
 /**
- * Connect to MongoDB Atlas
- * This function is called once in server.js when the app starts
+ * Connect to MongoDB, retrying in the background on failure.
+ *
+ * This deliberately does NOT call process.exit(). Exiting takes the whole
+ * service down, including /api/health, so a hosting platform reports an
+ * opaque 502/503 and the actual cause — a bad MONGO_URI or an IP that is not
+ * allowed through Atlas's network access list — is invisible from outside.
+ * Staying up keeps the health endpoint reachable and lets the API answer with
+ * a specific 503 while it keeps trying to reconnect.
  */
-const connectDB = async () => {
+const connectDB = async (retryDelayMs = 5000) => {
   try {
-    // ★ MONGO_URI comes from the .env file
-    // Example: mongodb+srv://atsuser:mypassword@cluster0.abcde.mongodb.net/ats_db
     const conn = await mongoose.connect(process.env.MONGO_URI, {
-      // These options are recommended for MongoDB Atlas connections
-      // (mongoose 6+ has these as defaults, but it's good to be explicit)
+      serverSelectionTimeoutMS: 10000,
     });
 
-    console.log(`✅ MongoDB Atlas Connected: ${conn.connection.host}`);
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     console.log(`   Database: ${conn.connection.name}`);
+    return true;
   } catch (error) {
-    console.error('❌ MongoDB Atlas Connection Error:', error.message);
-    // Exit the process with failure — can't run the app without DB
-    process.exit(1);
+    console.error('❌ MongoDB Connection Error:', error.message);
+    console.error('   The API stays up so /api/health remains reachable.');
+    console.error('   Database-backed routes return 503 until this resolves.');
+    console.error('   Common causes: a wrong MONGO_URI, or the host IP missing');
+    console.error('   from Atlas > Network Access.');
+    console.error(`   Retrying in ${retryDelayMs / 1000}s...`);
+    setTimeout(() => connectDB(retryDelayMs), retryDelayMs).unref();
+    return false;
   }
 };
 
 module.exports = connectDB;
+module.exports.connectDB = connectDB;
+module.exports.isDbConnected = isDbConnected;

@@ -9,6 +9,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const connectDB = require('./config/db');
+const { isDbConnected } = require('./config/db');
 const { configureCloudinary } = require('./config/cloudinary');
 
 const authRoutes = require('./routes/authRoutes');
@@ -56,12 +57,26 @@ app.get('/', (req, res) => {
   res.status(200).json({ success: true, message: 'ATS API. See /api/health.' });
 });
 
-// Health Check
+// Health Check — always answers, even when the database is unreachable, so the
+// cause of an outage is visible from outside the host.
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'ATS API is running!',
+    database: isDbConnected() ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
+  });
+});
+
+// Everything under /api past this point needs the database. Answer with a
+// specific 503 instead of letting each query fail with an opaque driver error.
+app.use('/api', (req, res, next) => {
+  if (isDbConnected()) return next();
+  return res.status(503).json({
+    success: false,
+    message:
+      'Database unavailable. The API is running but cannot reach MongoDB. ' +
+      'See /api/health.',
   });
 });
 

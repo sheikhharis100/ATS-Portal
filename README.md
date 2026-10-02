@@ -596,7 +596,7 @@ Set the environment variables from the [table above](#backend--mini-servicesats-
 |---------|-------|-----|
 | Buttons do nothing; Network tab shows the HTML 404 page for `/api/*` | `NEXT_PUBLIC_API_URL` is unset | Set it and **redeploy** (it is inlined at build time) |
 | `MongooseError: Operation ... buffering timed out after 10000ms` | The API cannot reach MongoDB | Check `MONGO_URI`, and add `0.0.0.0/0` under Atlas → Network Access |
-| Backend exits immediately on boot | `connectDB()` calls `process.exit(1)` when Mongo is unreachable | Same as above — fix the connection string or whitelist |
+| `503 Database unavailable` from `/api/*` | The API is up but cannot reach MongoDB | Check `/api/health` — it reports `database: connected\|disconnected` — then fix `MONGO_URI` or the Atlas IP allowlist. The API retries every 5s and recovers on its own. |
 | First production request takes ~60 s | Render free tier cold start | Expected. Keep the tab open or upgrade the plan |
 | CORS error in the console | Origin not allowed | Add it to `CLIENT_URL` (comma-separated) and redeploy the backend |
 | Seeded candidates cannot log in | Users were inserted with `insertMany`, skipping the bcrypt hook | Re-run `node seed.js` on current code, which uses `create()` |
