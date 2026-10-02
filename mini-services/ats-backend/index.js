@@ -26,13 +26,35 @@ connectDB();
 configureCloudinary();
 
 // Middleware
+// CLIENT_URL accepts a comma-separated list of allowed origins. Vercel preview
+// deployments get a fresh subdomain on every push, so *.vercel.app is allowed
+// too — otherwise the frontend breaks every time its URL changes.
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Non-browser callers (curl, server-to-server) send no Origin header.
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true);
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
   credentials: true,
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve locally-stored uploads (used when Cloudinary is not configured).
+app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
+
+// Root — lets uptime pings and manual checks confirm the service is alive.
+app.get('/', (req, res) => {
+  res.status(200).json({ success: true, message: 'ATS API. See /api/health.' });
+});
 
 // Health Check
 app.get('/api/health', (req, res) => {

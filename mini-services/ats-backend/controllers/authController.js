@@ -56,7 +56,7 @@ const generateToken = (id) => {
  */
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     // ── Validate required fields ──────────────────────────────────────────
     if (!name || !email || !password) {
@@ -77,11 +77,15 @@ exports.register = async (req, res) => {
 
     // ── Create the user ───────────────────────────────────────────────────
     // Password hashing is handled automatically by the User model pre-save hook
+    // ★ SECURITY: the role is NOT taken from the request body. Public
+    // registration always creates a candidate — otherwise anyone could POST
+    // {"role":"admin"} and grant themselves the admin portal. Admin accounts
+    // are created by seed.js or promoted directly in the database.
     const user = await User.create({
       name,
       email,
       password,
-      role: role || 'candidate', // Default to candidate if not specified
+      role: 'candidate',
     });
 
     // ── Generate JWT token and respond ────────────────────────────────────

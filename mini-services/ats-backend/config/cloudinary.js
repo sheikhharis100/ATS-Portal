@@ -36,7 +36,24 @@ const cloudinary = require('cloudinary').v2;
  * Configure Cloudinary with credentials from .env
  * This must be called before any upload operations
  */
+/**
+ * True only when all three credentials are present. When they are missing the
+ * upload helpers fall back to storing files on local disk, so the app still
+ * runs end-to-end without a Cloudinary account (see utils/cloudinaryUpload.js).
+ */
+const isCloudinaryConfigured = () =>
+  Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+  );
+
 const configureCloudinary = () => {
+  if (!isCloudinaryConfigured()) {
+    console.log('ℹ️  Cloudinary not configured — uploads will be saved to ./uploads');
+    return;
+  }
+
   cloudinary.config({
     // ★ CLOUDINARY CREDENTIALS — Get these from your Cloudinary Dashboard
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,    // e.g., "mycompany123"
@@ -48,4 +65,4 @@ const configureCloudinary = () => {
   console.log('✅ Cloudinary Configured');
 };
 
-module.exports = { cloudinary, configureCloudinary };
+module.exports = { cloudinary, configureCloudinary, isCloudinaryConfigured };

@@ -108,7 +108,8 @@ exports.uploadProfilePicture = async (req, res) => {
     const result = await uploadToCloudinary(
       req.file.buffer,
       'ats/profile-pictures',
-      'image'
+      'image',
+      req.file.originalname
     );
 
     user.profilePicture = result.url;
@@ -151,7 +152,8 @@ exports.uploadResume = async (req, res) => {
     const result = await uploadToCloudinary(
       req.file.buffer,
       'ats/resumes',
-      'raw'
+      'raw',
+      req.file.originalname
     );
 
     user.resume = result.url;

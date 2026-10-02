@@ -27,3 +27,18 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Locally-stored uploads (Cloudinary fallback)
+mini-services/ats-backend/uploads/
+
+# Vercel CLI
+.vercel
+
+# Env files (added by `vercel link`). The .env.example templates are
+# documentation and must stay tracked.
+.env*
+!.env.example
+!mini-services/ats-backend/.env.example
+
+# Local credential handoff (delete after use)
+RENDER-ENV-SETUP.txt

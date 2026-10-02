@@ -34,7 +34,63 @@
  * ============================================================================
  */
 
-const { cloudinary } = require('../config/cloudinary');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+
+const { cloudinary, isCloudinaryConfigured } = require('../config/cloudinary');
+
+// ---------------------------------------------------------------------------
+// Local-disk fallback
+// ---------------------------------------------------------------------------
+// When Cloudinary credentials are absent the app still needs somewhere to put
+// resumes and profile pictures, otherwise every upload 500s. Files go to
+// ./uploads, which index.js serves statically at /uploads.
+//
+// This is for local development. On an ephemeral host (Render, Vercel) the
+// disk is wiped on every restart, so set the Cloudinary vars in production.
+
+const UPLOAD_ROOT = path.join(__dirname, '..', 'uploads');
+
+// Public base URL of this API, used to build absolute file URLs.
+const publicBaseUrl = () =>
+  (process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 5000}`)
+    .replace(/\/+$/, '');
+
+const saveToLocalDisk = async (fileBuffer, folder, originalName) => {
+  const dir = path.join(UPLOAD_ROOT, folder);
+  await fs.promises.mkdir(dir, { recursive: true });
+
+  // Keep the real extension so browsers render PDFs and images correctly.
+  const ext = path.extname(originalName || '') || '';
+  const id = crypto.randomBytes(16).toString('hex');
+  const fileName = `${id}${ext}`;
+
+  await fs.promises.writeFile(path.join(dir, fileName), fileBuffer);
+
+  const relativePath = `${folder}/${fileName}`;
+  return {
+    url: `${publicBaseUrl()}/uploads/${relativePath}`,
+    // The 'local:' prefix tells deleteFromCloudinary which backend owns it.
+    public_id: `local:${relativePath}`,
+  };
+};
+
+const deleteFromLocalDisk = async (publicId) => {
+  const relativePath = publicId.slice('local:'.length);
+  const target = path.join(UPLOAD_ROOT, relativePath);
+
+  // Guard against a stored id escaping the uploads directory.
+  if (!path.resolve(target).startsWith(path.resolve(UPLOAD_ROOT))) return null;
+
+  try {
+    await fs.promises.unlink(target);
+    console.log(`✅ Deleted local upload: ${relativePath}`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.error('Local delete error:', error);
+  }
+  return null;
+};
 
 /**
  * Upload a file buffer to Cloudinary
@@ -45,7 +101,11 @@ const { cloudinary } = require('../config/cloudinary');
  * @param {String} resourceType - 'image' for pictures, 'raw' for PDFs/DOCX
  * @returns {Object} { url, public_id } - The Cloudinary URL and public ID
  */
-const uploadToCloudinary = (fileBuffer, folder, resourceType = 'raw') => {
+const uploadToCloudinary = (fileBuffer, folder, resourceType = 'raw', originalName = '') => {
+  if (!isCloudinaryConfigured()) {
+    return saveToLocalDisk(fileBuffer, folder, originalName);
+  }
+
   return new Promise((resolve, reject) => {
     // ★ Cloudinary upload stream — reads the buffer and uploads to cloud
     const uploadStream = cloudinary.uploader.upload_stream(
@@ -90,6 +150,8 @@ const uploadToCloudinary = (fileBuffer, folder, resourceType = 'raw') => {
 const deleteFromCloudinary = async (publicId, resourceType = 'raw') => {
   try {
     if (!publicId) return null;
+
+    if (publicId.startsWith('local:')) return deleteFromLocalDisk(publicId);
 
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType,

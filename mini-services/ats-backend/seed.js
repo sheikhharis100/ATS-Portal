@@ -26,6 +26,16 @@ const { User, Job, Branch, Application } = require('./models');
 
 const connectDB = require('./config/db');
 
+/**
+ * Deadlines are relative to the day the seed runs, so the sample jobs never
+ * show up as already expired (hard-coded dates go stale the moment they pass).
+ */
+const daysFromNow = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
+};
+
 const seedData = async () => {
   try {
     // ── Connect to MongoDB Atlas ──────────────────────────────────────────
@@ -95,7 +105,10 @@ const seedData = async () => {
     // ═══════════════════════════════════════════════════════════════════════
     // 3. CREATE SAMPLE CANDIDATES
     // ═══════════════════════════════════════════════════════════════════════
-    const candidates = await User.insertMany([
+    // ★ User.create() — NOT insertMany(). insertMany bypasses Mongoose 'save'
+    // middleware, so the bcrypt pre-save hook in models/User.js would never
+    // run and these passwords would be stored in plain text, making login fail.
+    const candidates = await User.create([
       {
         name: 'Ali Khan',
         email: 'ali@example.com',
@@ -135,7 +148,7 @@ const seedData = async () => {
         salaryMax: 150000,
         availableSeats: 3,
         skills: ['React', 'JavaScript', 'HTML', 'CSS', 'REST API'],
-        deadline: new Date('2026-08-31'),
+        deadline: daysFromNow(45),
         status: 'Open',
         createdBy: admin._id,
       },
@@ -150,7 +163,7 @@ const seedData = async () => {
         salaryMax: 120000,
         availableSeats: 2,
         skills: ['Figma', 'Adobe XD', 'UI Design', 'User Research'],
-        deadline: new Date('2026-07-31'),
+        deadline: daysFromNow(30),
         status: 'Open',
         createdBy: admin._id,
       },
@@ -165,7 +178,7 @@ const seedData = async () => {
         salaryMax: 200000,
         availableSeats: 2,
         skills: ['Node.js', 'Express', 'MongoDB', 'REST API', 'JWT'],
-        deadline: new Date('2026-09-15'),
+        deadline: daysFromNow(60),
         status: 'Open',
         createdBy: admin._id,
       },
@@ -180,7 +193,7 @@ const seedData = async () => {
         salaryMax: 180000,
         availableSeats: 1,
         skills: ['Docker', 'AWS', 'CI/CD', 'Linux', 'Kubernetes'],
-        deadline: new Date('2026-10-01'),
+        deadline: daysFromNow(90),
         status: 'Open',
         createdBy: admin._id,
       },
@@ -195,7 +208,7 @@ const seedData = async () => {
         salaryMax: 35000,
         availableSeats: 5,
         skills: ['Social Media', 'Content Writing', 'SEO'],
-        deadline: new Date('2026-06-30'),
+        deadline: daysFromNow(21),
         status: 'Open',
         createdBy: admin._id,
       },
